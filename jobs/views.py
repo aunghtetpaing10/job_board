@@ -7,14 +7,11 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 # Create your views here.
-class EmployerListCreate(generics.ListCreateAPIView):
+class EmployerPublicView(generics.RetrieveAPIView):
+    """View for retrieving public employer information"""
     queryset = Employer.objects.all()
     serializer_class = EmployerSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-        
+    permission_classes = [permissions.AllowAny]
     
 class EmployerRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     queryset = Employer.objects.all()
@@ -110,6 +107,10 @@ class ApplicationListCreate(generics.ListCreateAPIView):
         job_pk = self.kwargs.get('job_pk')
         job = get_object_or_404(Job, pk=job_pk)
         
+        # Check if user is an employer
+        if Employer.objects.filter(user=user).exists():
+            raise PermissionDenied("Employers cannot apply to job listings")
+        
         # Check if the job is still accepting applications
         if job.status != 'PUBLISHED':
             raise PermissionDenied("This job is not accepting applications")
@@ -166,3 +167,24 @@ class UserRegistrationView(generics.CreateAPIView):
             'user': UserSerializer(user).data,
             'profile': profile_serializer.data
         }, status=status.HTTP_201_CREATED)
+
+class ApplicantProfileView(generics.RetrieveUpdateAPIView):
+    serializer_class = ApplicantSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_object(self):
+        try:
+            return Applicant.objects.get(user=self.request.user)
+        except Applicant.DoesNotExist:
+            raise PermissionDenied("Only applicants can access this endpoint")
+
+class ApplicantListView(generics.ListAPIView):
+    serializer_class = ApplicantSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = Applicant.objects.all()
+    
+    def get_queryset(self):
+        # Only employers should be able to list all applicants
+        if not Employer.objects.filter(user=self.request.user).exists():
+            raise PermissionDenied("Only employers can view all applicants")
+        return super().get_queryset()
