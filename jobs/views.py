@@ -66,23 +66,38 @@ class JobRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
         return Job.objects.filter(status='PUBLISHED')
     
 
-class ApplicationListCreate(generics.ListCreateAPIView):
+class UserApplicationList(generics.ListAPIView):
     serializer_class = ApplicationSerializer
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
         user = self.request.user
         try:
-            # If the user is an employer
             employer = Employer.objects.get(user=user)
             return Application.objects.filter(job__employer=employer)
         except Employer.DoesNotExist:
-            # If the user is an applicant
             return Application.objects.filter(applicant=user)
+    
+
+class ApplicationListCreate(generics.ListCreateAPIView):
+    serializer_class = ApplicationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        job_pk = self.kwargs.get('job_pk')
+        user = self.request.user
+        try:
+            # If the user is an employer
+            employer = Employer.objects.get(user=user)
+            return Application.objects.filter(job__employer=employer, job_id=job_pk)
+        except Employer.DoesNotExist:
+            # If the user is an applicant
+            return Application.objects.filter(applicant=user, job_id=job_pk)
         
     def perform_create(self, serializer):
         user = self.request.user
-        job = get_object_or_404(Job, pk=self.request.data.get('job'))
+        job_pk = self.kwargs.get('job_pk')
+        job = get_object_or_404(Job, pk=job_pk)
         
         # Check if the job is still accepting applications
         if job.status != 'PUBLISHED':
@@ -103,11 +118,12 @@ class ApplicationRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     
     def get_queryset(self):
         user = self.request.user
+        job_pk = self.kwargs.get('job_pk')
         try:
             employer = Employer.objects.get(user=user)
-            return Application.objects.filter(job__employer=employer)
+            return Application.objects.filter(job__employer=employer, job_id=job_pk)
         except Employer.DoesNotExist:
-            return Application.objects.filter(applicant=user)
+            return Application.objects.filter(applicant=user, job_id=job_pk)
         
     def perform_create(self, serializer):
         user = self.request.user
