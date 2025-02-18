@@ -18,8 +18,11 @@ class EmployerRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = EmployerSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     
-    def get_queryset(self):
-        return Employer.objects.filter(user=self.request.user)
+    def get_object(self):
+        try:
+            return Employer.objects.get(user=self.request.user)
+        except Employer.DoesNotExist:
+            raise PermissionDenied("Only employers can access this endpoint")
     
 
 class JobListCreate(generics.ListCreateAPIView):
