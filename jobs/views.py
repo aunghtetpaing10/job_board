@@ -142,14 +142,27 @@ class ApplicationRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
         
     def perform_update(self, serializer):
         user = self.request.user
+        
         try:
+            # If user is an employer
             employer = Employer.objects.get(user=user)
             if serializer.instance.job.employer == employer:
+                if set(serializer.validated_data.keys()) - {'status'}:
+                    raise PermissionDenied("Employers can only update application status")
                 serializer.save()
             else:
                 raise PermissionDenied("You can only update applications for your own jobs")
         except Employer.DoesNotExist:
-            raise PermissionDenied("Only employers can update application status")
+            
+            # If user is an applicant
+            if serializer.instance.applicant.id != user.id:
+                raise PermissionDenied("You can only update your own applications")
+            
+            update_fields = set(serializer.validated_data.keys())
+            allowed_fields = {'cover_letter', 'resume'}
+            if not update_fields.issubset(allowed_fields):
+                raise PermissionDenied("Applicants can only update their cover letter and resume")
+            serializer.save()
 
 class UserRegistrationView(generics.CreateAPIView):
     serializer_class = UserSerializer

@@ -59,8 +59,12 @@ class ApplicationSerializer(serializers.ModelSerializer):
     job_id = serializers.PrimaryKeyRelatedField(
         queryset=Job.objects.all(),
         write_only=True,
-        source="job"
+        source="job",
+        required=False
     )
+    cover_letter = serializers.CharField(required=False)
+    resume = serializers.FileField(required=False)
+    status = serializers.CharField(required=False)
     
     class Meta:
         model = Application
