@@ -9,4 +9,5 @@ urlpatterns = [
     path('applications/', views.UserApplicationList.as_view(), name='user-applications'),
     path('jobs/<int:job_pk>/applications/', views.ApplicationListCreate.as_view(), name='application-list'),
     path('jobs/<int:job_pk>/applications/<int:pk>/', views.ApplicationRetrieveUpdateDestroy.as_view(), name='application-detail'),
+    path('register/', views.UserRegistrationView.as_view(), name='user-registration'),
 ]

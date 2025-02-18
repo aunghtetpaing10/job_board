@@ -1,6 +1,10 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+class UserType(models.TextChoices):
+    EMPLOYER = 'EMPLOYER', 'Employer'
+    APPLICANT = 'APPLICANT', 'Applicant'
+
 # Create your models here.
 class Employer(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -71,3 +75,13 @@ class Application(models.Model):
     class Meta:
         ordering = ["-applied_at"]
         unique_together = ['job', 'applicant'] # Prevent multiple applications for the same job
+
+class Applicant(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    resume = models.FileField(upload_to="applicant_resumes/", blank=True, null=True)
+    skills = models.TextField(blank=True, null=True)
+    experience = models.TextField(blank=True, null=True)
+    education = models.TextField(blank=True, null=True)
+    
+    def __str__(self):
+        return self.user.get_full_name() or self.user.username

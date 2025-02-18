@@ -1,7 +1,8 @@
-from .serializers import EmployerSerializer, JobSerializer, ApplicationSerializer
-from .models import Employer, Job, Application
-from rest_framework import generics, permissions
+from .serializers import EmployerSerializer, JobSerializer, ApplicationSerializer, UserSerializer, ApplicantSerializer
+from .models import Employer, Job, Application, Applicant
+from rest_framework import generics, permissions, status
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -65,6 +66,16 @@ class JobRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
                 return Job.objects.filter(status='PUBLISHED')
         return Job.objects.filter(status='PUBLISHED')
     
+    def perform_update(self, serializer):
+        try:
+            employer = Employer.objects.get(user=self.request.user)
+            if serializer.instance.employer == employer:
+                serializer.save()
+            else:
+                raise PermissionDenied("You can only update your own job listings")
+        except Employer.DoesNotExist:
+            raise PermissionDenied("Only employers can update job listings")
+    
 
 class UserApplicationList(generics.ListAPIView):
     serializer_class = ApplicationSerializer
@@ -125,7 +136,7 @@ class ApplicationRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
         except Employer.DoesNotExist:
             return Application.objects.filter(applicant=user, job_id=job_pk)
         
-    def perform_create(self, serializer):
+    def perform_update(self, serializer):
         user = self.request.user
         try:
             employer = Employer.objects.get(user=user)
@@ -135,3 +146,23 @@ class ApplicationRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
                 raise PermissionDenied("You can only update applications for your own jobs")
         except Employer.DoesNotExist:
             raise PermissionDenied("Only employers can update application status")
+
+class UserRegistrationView(generics.CreateAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [permissions.AllowAny]
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        
+        # Return appropriate profile based on user type
+        if hasattr(user, 'employer'):
+            profile_serializer = EmployerSerializer(user.employer)
+        else:
+            profile_serializer = ApplicantSerializer(user.applicant)
+            
+        return Response({
+            'user': UserSerializer(user).data,
+            'profile': profile_serializer.data
+        }, status=status.HTTP_201_CREATED)

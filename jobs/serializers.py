@@ -1,11 +1,38 @@
 from rest_framework import serializers
-from .models import Employer, Job, Application
+from .models import Employer, Job, Application, Applicant, UserType
 from django.contrib.auth.models import User
+from django.db import transaction
 
 class UserSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+    user_type = serializers.ChoiceField(choices=UserType.choices, write_only=True)
+    
     class Meta:
         model = User
-        field = ["id", "username", "first_name", "last_name", "email"]
+        fields = ["id", "username", "first_name", "last_name", "email", "password", "user_type"]
+        
+    def create(self, validated_data):
+        user_type = validated_data.pop('user_type')
+        password = validated_data.pop('password')
+        
+        with transaction.atomic():
+            user = User.objects.create(**validated_data)
+            user.set_password(password)
+            user.save()
+            
+            if user_type == UserType.EMPLOYER:
+                Employer.objects.create(user=user)
+            else:
+                Applicant.objects.create(user=user)
+                
+        return user
+
+class ApplicantSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    
+    class Meta:
+        model = Applicant
+        fields = "__all__"
 
 class EmployerSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
